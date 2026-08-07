@@ -1,0 +1,72 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Light mode (default) — warm beige ── */
+:root {
+  --th-bg:  #d8d0c4;
+  --th-s:   #f0ebe1;
+  --th-s2:  #e6dfd5;
+  --th-s3:  #ddd6ca;
+  --th-b:   #c8c0b4;
+  --th-b2:  #c2bab0;
+  --th-b3:  #b8b0a6;
+  --th-t:   #1c1714;
+  --th-t2:  #4a4440;
+  --th-t3:  #7a7068;
+  --th-t4:  #a09888;
+  --th-scrl: #b8b0a6;
+}
+
+/* ── Dark mode ── */
+.dark {
+  --th-bg:  #0f172a;
+  --th-s:   #1e293b;
+  --th-s2:  #334155;
+  --th-s3:  #475569;
+  --th-b:   #1e293b;
+  --th-b2:  #334155;
+  --th-b3:  #475569;
+  --th-t:   #ffffff;
+  --th-t2:  #cbd5e1;
+  --th-t3:  #94a3b8;
+  --th-t4:  #64748b;
+  --th-scrl: #334155;
+}
+
+* {
+  -webkit-tap-highlight-color: transparent;
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  background-color: var(--th-bg);
+  color: var(--th-t);
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  user-select: none;
+  transition: background-color 0.2s, color 0.2s;
+}
+
+/* Touch scrolling */
+.scroll-touch {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Scrollbar */
+.scroll-touch::-webkit-scrollbar { width: 4px; }
+.scroll-touch::-webkit-scrollbar-track { background: transparent; }
+.scroll-touch::-webkit-scrollbar-thumb { background: var(--th-scrl); border-radius: 2px; }
+
+/* Hide scrollbar completely */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* Tactile press effect */
+.btn-touch {
+  @apply active:scale-95 transition-transform duration-75 cursor-pointer select-none;
+}

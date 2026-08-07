@@ -1,0 +1,27 @@
+appId: com.smartpos.app
+productName: SmartPOS
+copyright: Copyright © 2024
+
+icon: build/icon.ico
+
+directories:
+  buildResources: build
+  output: dist
+
+files:
+  - out/**/*
+  - node_modules/**/*
+  - "!node_modules/.cache/**/*"
+
+win:
+  target:
+    - nsis
+  requestedExecutionLevel: requireAdministrator
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+
+npmRebuild: true

@@ -1,0 +1,8 @@
+node_modules/
+dist/
+dist-barcode/
+out/
+*.exe
+*.blockmap
+.DS_Store
+Thumbs.db

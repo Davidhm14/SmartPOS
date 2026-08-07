@@ -1,9 +1,11 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { Search, Landmark } from 'lucide-react'
 import ProductoCard from '../components/ProductoCard'
 import Carrito from '../components/Carrito'
 import ModalPago from '../components/ModalPago'
 import ModalPeso from '../components/ModalPeso'
+
+const LETRAS = ['Todos','A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z']
 
 let cartIdCounter = 0
 
@@ -44,7 +46,7 @@ function PrecioSelector({ producto, onSeleccionar, onCerrar }) {
   return (
     <div className="fixed inset-0 bg-black/50 flex items-end justify-center z-40 p-4" onClick={onCerrar}>
       <div className="bg-th-s rounded-2xl w-full max-w-sm p-5 space-y-3 border border-th-b2 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-        <p className="text-th-t font-bold text-center">{producto.nombre}</p>
+        <p className="text-th-t font-bold text-center">{producto.descripcion?.trim() || producto.nombre}</p>
         <p className="text-th-t3 text-sm text-center">Selecciona el precio de venta</p>
         <div className="grid grid-cols-2 gap-3">
           <button
@@ -70,27 +72,40 @@ function PrecioSelector({ producto, onSeleccionar, onCerrar }) {
 
 export default function Ventas({ config }) {
   const [productos, setProductos] = useState([])
-  const [categorias, setCategorias] = useState([])
-  const [categoriaActiva, setCategoriaActiva] = useState(null)
+  const [todosProductos, setTodosProductos] = useState([])
+  const [letraActiva, setLetraActiva] = useState('Todos')
   const [busqueda, setBusqueda] = useState('')
   const [carrito, setCarrito] = useState([])
   const [clientes, setClientes] = useState([])
   const [mostrarPago, setMostrarPago] = useState(false)
   const [productoPeso, setProductoPeso] = useState(null)
   const [productoOferta, setProductoOferta] = useState(null)
+  const inputRef = useRef(null)
 
   const cargarProductos = useCallback(async () => {
     const filtros = {}
-    if (categoriaActiva) filtros.categoria_id = categoriaActiva
     if (busqueda) filtros.busqueda = busqueda
-    setProductos(await window.api.listarProductos(filtros))
-  }, [categoriaActiva, busqueda])
+    const data = await window.api.listarProductos(filtros)
+    setTodosProductos(data)
+  }, [busqueda])
 
   useEffect(() => { cargarProductos() }, [cargarProductos])
+  useEffect(() => { window.api.listarClientes().then(setClientes) }, [])
+
   useEffect(() => {
-    window.api.listarCategorias().then(setCategorias)
-    window.api.listarClientes().then(setClientes)
-  }, [])
+    if (letraActiva === 'Todos') {
+      setProductos(todosProductos)
+    } else {
+      setProductos(todosProductos.filter((p) => {
+        const display = (p.descripcion?.trim() || p.nombre || '').toUpperCase()
+        return display.startsWith(letraActiva)
+      }))
+    }
+  }, [letraActiva, todosProductos])
+
+  useEffect(() => {
+    if (busqueda) setLetraActiva('Todos')
+  }, [busqueda])
 
   const addToCartDirect = (producto, precio) => {
     setCarrito((prev) => {
@@ -98,6 +113,7 @@ export default function Ventas({ config }) {
       if (existente) return prev.map((i) => i.id === producto.id && i.precio === precio ? { ...i, cantidad: i.cantidad + 1 } : i)
       return [...prev, { ...producto, precio, cantidad: 1, _cartId: ++cartIdCounter }]
     })
+    if (busqueda) { setBusqueda(''); inputRef.current?.focus() }
   }
 
   const agregarAlCarrito = (producto) => {
@@ -150,8 +166,9 @@ export default function Ventas({ config }) {
             <div className="relative flex-1">
               <Search size={15} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-th-t3" />
               <input
+                ref={inputRef}
                 type="text"
-                placeholder="Buscar producto..."
+                placeholder="Buscar por codigo o descripcion..."
                 className="w-full bg-th-s border border-th-b2 rounded-xl pl-8 pr-3 py-2 text-th-t text-sm focus:outline-none focus:border-blue-500"
                 value={busqueda}
                 onChange={(e) => setBusqueda(e.target.value)}
@@ -166,22 +183,15 @@ export default function Ventas({ config }) {
               <span className="text-xs font-medium">Abrir caja</span>
             </button>
           </div>
-          <div className="flex gap-1.5 overflow-x-auto pb-0.5 no-scrollbar">
-            <button
-              onClick={() => setCategoriaActiva(null)}
-              className={`shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors btn-touch
-                ${!categoriaActiva ? 'bg-blue-600 text-white' : 'bg-th-s text-th-t2 hover:bg-th-s2'}`}
-            >
-              Todos
-            </button>
-            {categorias.map((c) => (
+          <div className="flex gap-1 overflow-x-auto pb-0.5 no-scrollbar">
+            {LETRAS.map((l) => (
               <button
-                key={c.id}
-                onClick={() => setCategoriaActiva(c.id === categoriaActiva ? null : c.id)}
-                className={`shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors btn-touch
-                  ${categoriaActiva === c.id ? 'bg-blue-600 text-white' : 'bg-th-s text-th-t2 hover:bg-th-s2'}`}
+                key={l}
+                onClick={() => { setLetraActiva(l); setBusqueda('') }}
+                className={`shrink-0 min-w-[28px] px-1.5 py-1.5 rounded-lg text-xs font-bold transition-colors btn-touch
+                  ${letraActiva === l ? 'bg-blue-600 text-white' : 'bg-th-s text-th-t2 hover:bg-th-s2'}`}
               >
-                {c.nombre}
+                {l === 'Todos' ? 'Todo' : l}
               </button>
             ))}
           </div>
@@ -191,7 +201,7 @@ export default function Ventas({ config }) {
           {productos.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-th-t3 text-sm">
               <p>No hay productos</p>
-              <p className="text-xs mt-1">Agrega productos en el módulo Productos</p>
+              <p className="text-xs mt-1">Agrega productos en el modulo Productos</p>
             </div>
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: '6px' }}>

@@ -40,7 +40,7 @@ export default function ProductoCard({ producto, onClick }) {
       </div>
       <div className="px-1.5 py-1">
         <p className="text-th-t font-semibold leading-tight line-clamp-2" style={{ fontSize: '11px' }}>
-          {producto.nombre}
+          {producto.descripcion?.trim() || producto.nombre}
         </p>
         {producto.precio_oferta > 0 ? (
           <div>

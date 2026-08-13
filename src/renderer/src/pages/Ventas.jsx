@@ -116,6 +116,23 @@ export default function Ventas({ config }) {
     if (busqueda) { setBusqueda(''); inputRef.current?.focus() }
   }
 
+  const handleSearchKeyDown = async (e) => {
+    if (e.key !== 'Enter') return
+    e.preventDefault()
+    const term = busqueda.trim()
+    if (!term) return
+    const data = await window.api.listarProductos({ busqueda: term })
+    if (!data.length) return
+    const termUpper = term.toUpperCase()
+    const exacto = data.find(
+      (p) =>
+        (p.descripcion?.trim() || '').toUpperCase() === termUpper ||
+        p.nombre.toUpperCase() === termUpper
+    )
+    const producto = exacto ?? (data.length === 1 ? data[0] : null)
+    if (producto) agregarAlCarrito(producto)
+  }
+
   const agregarAlCarrito = (producto) => {
     if (producto.venta_por_peso) { setProductoPeso(producto); return }
     if (producto.precio_oferta > 0) { setProductoOferta(producto); return }
@@ -172,6 +189,7 @@ export default function Ventas({ config }) {
                 className="w-full bg-th-s border border-th-b2 rounded-xl pl-8 pr-3 py-2 text-th-t text-sm focus:outline-none focus:border-blue-500"
                 value={busqueda}
                 onChange={(e) => setBusqueda(e.target.value)}
+                onKeyDown={handleSearchKeyDown}
               />
             </div>
             <button

@@ -9,6 +9,7 @@ import { registerReportesHandlers } from './ipc/reportes'
 import { registerConfigHandlers } from './ipc/config'
 import { registerBasculaHandlers, autoConectarBascula } from './ipc/bascula'
 import { registerInventarioHandlers } from './ipc/inventario'
+import { registerTicketsHandlers } from './ipc/tickets'
 import { existsSync, mkdirSync, copyFileSync, readdirSync, unlinkSync } from 'fs'
 
 let mainWindow = null
@@ -43,9 +44,42 @@ function createWindow() {
   }
 }
 
-app.whenReady().then(() => {
+async function instalarBdPrueba() {
+  if (!app.isPackaged) return
+  const dbDest = join(app.getPath('userData'), 'pos.db')
+  if (existsSync(dbDest)) return
+
+  const { response } = await dialog.showMessageBox({
+    type: 'question',
+    title: 'SmartPOS — Primera instalación',
+    message: '¿Desea instalar con la base de datos de productos de ejemplo?',
+    detail: 'Incluye productos con imágenes y categorías listos para usar.\nSolo deberá actualizar los precios.',
+    buttons: ['Sí, instalar con productos de ejemplo', 'No, empezar vacío'],
+    defaultId: 0,
+    cancelId: 1
+  })
+
+  if (response === 0) {
+    const pruebaDir = join(process.resourcesPath, 'prueba')
+    const pruebaDb  = join(pruebaDir, 'pos.db')
+    const pruebaImg = join(pruebaDir, 'imagenes')
+    if (existsSync(pruebaDb)) {
+      copyFileSync(pruebaDb, dbDest)
+    }
+    if (existsSync(pruebaImg)) {
+      const imgDest = join(app.getPath('userData'), 'imagenes')
+      if (!existsSync(imgDest)) mkdirSync(imgDest, { recursive: true })
+      readdirSync(pruebaImg).forEach((file) => {
+        try { copyFileSync(join(pruebaImg, file), join(imgDest, file)) } catch (_) {}
+      })
+    }
+  }
+}
+
+app.whenReady().then(async () => {
   ipcMain.handle('app:getUserDataPath', () => app.getPath('userData'))
 
+  await instalarBdPrueba()
   initDatabase()
   registerProductosHandlers()
   registerVentasHandlers()
@@ -53,6 +87,7 @@ app.whenReady().then(() => {
   registerReportesHandlers()
   registerConfigHandlers()
   registerInventarioHandlers()
+  registerTicketsHandlers()
   registerBasculaHandlers((channel, data) => {
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send(channel, data)

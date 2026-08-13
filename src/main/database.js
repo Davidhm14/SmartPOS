@@ -100,6 +100,13 @@ export function initDatabase() {
       fecha TEXT DEFAULT (datetime('now','localtime')),
       FOREIGN KEY (producto_id) REFERENCES productos(id)
     );
+
+    CREATE TABLE IF NOT EXISTS tickets_pendientes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      nombre TEXT NOT NULL DEFAULT 'Ticket',
+      items TEXT NOT NULL DEFAULT '[]',
+      creado TEXT DEFAULT (datetime('now','localtime'))
+    );
   `)
 
   // Default payment methods

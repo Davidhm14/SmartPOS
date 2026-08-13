@@ -67,6 +67,13 @@ contextBridge.exposeInMainWorld('api', {
   inventarioListar: (filtros) => ipcRenderer.invoke('inventario:listar', filtros),
   inventarioAjuste: (data) => ipcRenderer.invoke('inventario:ajuste', data),
 
+  // Tickets pendientes (mesas)
+  ticketsListar: () => ipcRenderer.invoke('tickets:listar'),
+  ticketsCrear: (nombre) => ipcRenderer.invoke('tickets:crear', nombre),
+  ticketsGuardar: (data) => ipcRenderer.invoke('tickets:guardar', data),
+  ticketsRenombrar: (data) => ipcRenderer.invoke('tickets:renombrar', data),
+  ticketsEliminar: (id) => ipcRenderer.invoke('tickets:eliminar', id),
+
   // Caja
   abrirCaja: () => ipcRenderer.invoke('caja:abrir'),
 

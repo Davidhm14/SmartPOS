@@ -1,7 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Search, Landmark } from 'lucide-react'
-import ProductoCard from '../components/ProductoCard'
-import Carrito from '../components/Carrito'
+import { Search, Plus, X, Landmark } from 'lucide-react'
 import ModalPago from '../components/ModalPago'
 import ModalPeso from '../components/ModalPeso'
 
@@ -69,15 +67,38 @@ function PrecioSelector({ producto, onSeleccionar, onCerrar }) {
 }
 
 export default function Ventas({ config }) {
+  const [tickets, setTickets] = useState([])
+  const [ticketActivoId, setTicketActivoId] = useState(null)
   const [productos, setProductos] = useState([])
   const [categorias, setCategorias] = useState([])
   const [categoriaActiva, setCategoriaActiva] = useState(null)
   const [busqueda, setBusqueda] = useState('')
-  const [carrito, setCarrito] = useState([])
   const [clientes, setClientes] = useState([])
   const [mostrarPago, setMostrarPago] = useState(false)
   const [productoPeso, setProductoPeso] = useState(null)
   const [productoOferta, setProductoOferta] = useState(null)
+  const [editandoId, setEditandoId] = useState(null)
+  const [nombreTmp, setNombreTmp] = useState('')
+
+  useEffect(() => {
+    window.api.listarCategorias().then(setCategorias)
+    window.api.listarClientes().then(setClientes)
+    cargarTickets()
+  }, [])
+
+  const cargarTickets = async () => {
+    let ts = await window.api.ticketsListar()
+    ts = ts.map((t) => ({
+      ...t,
+      items: (t.items || []).map((item) => ({ ...item, _cartId: ++cartIdCounter }))
+    }))
+    if (ts.length === 0) {
+      const nuevo = await window.api.ticketsCrear('Mesa 1')
+      ts = [{ ...nuevo, items: [] }]
+    }
+    setTickets(ts)
+    setTicketActivoId(ts[0].id)
+  }
 
   const cargarProductos = useCallback(async () => {
     const filtros = {}
@@ -87,32 +108,74 @@ export default function Ventas({ config }) {
   }, [categoriaActiva, busqueda])
 
   useEffect(() => { cargarProductos() }, [cargarProductos])
-  useEffect(() => {
-    window.api.listarCategorias().then(setCategorias)
-    window.api.listarClientes().then(setClientes)
-  }, [])
 
-  const addToCartDirect = (producto, precio) => {
+  const ticketActivo = tickets.find((t) => t.id === ticketActivoId)
+  const carrito = ticketActivo?.items || []
+
+  const setCarrito = useCallback((updater) => {
+    setTickets((prev) =>
+      prev.map((t) => {
+        if (t.id !== ticketActivoId) return t
+        const newItems = typeof updater === 'function' ? updater(t.items || []) : updater
+        window.api.ticketsGuardar({ id: t.id, items: newItems.map(({ _cartId, ...rest }) => rest) })
+        return { ...t, items: newItems }
+      })
+    )
+  }, [ticketActivoId])
+
+  const addToCartDirect = useCallback((producto, precio) => {
     setCarrito((prev) => {
       const existente = prev.find((i) => i.id === producto.id && i.precio === precio)
-      if (existente) return prev.map((i) => i.id === producto.id && i.precio === precio ? { ...i, cantidad: i.cantidad + 1 } : i)
+      if (existente)
+        return prev.map((i) =>
+          i.id === producto.id && i.precio === precio ? { ...i, cantidad: i.cantidad + 1 } : i
+        )
       return [...prev, { ...producto, precio, cantidad: 1, _cartId: ++cartIdCounter }]
     })
-  }
+  }, [setCarrito])
 
   const agregarAlCarrito = (producto) => {
+    if (!ticketActivoId) return
     if (producto.venta_por_peso) { setProductoPeso(producto); return }
     if (producto.precio_oferta > 0) { setProductoOferta(producto); return }
     addToCartDirect(producto, producto.precio)
   }
 
-  const agregarPesado = (item) => {
-    setCarrito((prev) => [...prev, { ...item, _cartId: ++cartIdCounter }])
-  }
-
   const cambiarCantidad = (cartId, cantidad) => {
     if (cantidad <= 0) setCarrito((prev) => prev.filter((i) => i._cartId !== cartId))
     else setCarrito((prev) => prev.map((i) => i._cartId === cartId ? { ...i, cantidad } : i))
+  }
+
+  const nuevoTicket = async () => {
+    const num = tickets.length + 1
+    const nuevo = await window.api.ticketsCrear(`Mesa ${num}`)
+    setTickets((prev) => [...prev, { ...nuevo, items: [] }])
+    setTicketActivoId(nuevo.id)
+  }
+
+  const cerrarTicket = async (id, e) => {
+    e.stopPropagation()
+    if (tickets.length === 1) return
+    await window.api.ticketsEliminar(id)
+    setTickets((prev) => {
+      const restantes = prev.filter((t) => t.id !== id)
+      if (ticketActivoId === id) setTicketActivoId(restantes[0].id)
+      return restantes
+    })
+  }
+
+  const iniciarRename = (e, id, nombre) => {
+    e.stopPropagation()
+    e.preventDefault()
+    setEditandoId(id)
+    setNombreTmp(nombre)
+  }
+
+  const confirmarRename = async () => {
+    if (!nombreTmp.trim()) { setEditandoId(null); return }
+    await window.api.ticketsRenombrar({ id: editandoId, nombre: nombreTmp.trim() })
+    setTickets((prev) => prev.map((t) => t.id === editandoId ? { ...t, nombre: nombreTmp.trim() } : t))
+    setEditandoId(null)
   }
 
   useEffect(() => {
@@ -135,7 +198,14 @@ export default function Ventas({ config }) {
     } else {
       window.api.abrirCaja()
     }
-    setCarrito([])
+    await window.api.ticketsEliminar(ticketActivoId)
+    let restantes = tickets.filter((t) => t.id !== ticketActivoId)
+    if (restantes.length === 0) {
+      const nuevo = await window.api.ticketsCrear('Mesa 1')
+      restantes = [{ ...nuevo, items: [] }]
+    }
+    setTickets(restantes)
+    setTicketActivoId(restantes[0].id)
     setMostrarPago(false)
     cargarProductos()
   }
@@ -144,7 +214,8 @@ export default function Ventas({ config }) {
 
   return (
     <div className="flex h-full overflow-hidden">
-      <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+      {/* Panel izquierdo: lista de productos */}
+      <div className="flex-1 flex flex-col overflow-hidden min-w-0 border-r border-th-b2">
         <div className="px-2 pt-2 pb-1 space-y-1.5">
           <div className="flex gap-2">
             <div className="relative flex-1">
@@ -171,44 +242,156 @@ export default function Ventas({ config }) {
               onClick={() => setCategoriaActiva(null)}
               className={`shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors btn-touch
                 ${!categoriaActiva ? 'bg-blue-600 text-white' : 'bg-th-s text-th-t2 hover:bg-th-s2'}`}
-            >
-              Todos
-            </button>
+            >Todos</button>
             {categorias.map((c) => (
               <button
                 key={c.id}
                 onClick={() => setCategoriaActiva(c.id === categoriaActiva ? null : c.id)}
                 className={`shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors btn-touch
                   ${categoriaActiva === c.id ? 'bg-blue-600 text-white' : 'bg-th-s text-th-t2 hover:bg-th-s2'}`}
-              >
-                {c.nombre}
-              </button>
+              >{c.nombre}</button>
             ))}
           </div>
         </div>
 
-        <div className="flex-1 scroll-touch px-2 pb-2">
+        <div className="flex-1 overflow-y-auto scroll-touch px-2 pb-2 space-y-1">
           {productos.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full text-th-t3 text-sm">
+            <div className="flex flex-col items-center justify-center h-32 text-th-t3 text-sm">
               <p>No hay productos</p>
               <p className="text-xs mt-1">Agrega productos en el módulo Productos</p>
             </div>
-          ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: '6px' }}>
-              {productos.map((p) => (
-                <ProductoCard key={p.id} producto={p} onClick={agregarAlCarrito} />
-              ))}
-            </div>
-          )}
+          ) : productos.map((p) => (
+            <button
+              key={p.id}
+              onClick={() => agregarAlCarrito(p)}
+              className="w-full flex items-center px-3 py-2.5 bg-th-s hover:bg-th-s2 border border-th-b2 hover:border-blue-400 rounded-xl text-left btn-touch transition-colors"
+            >
+              <span className="flex-1 text-th-t text-sm font-medium truncate">{p.nombre}</span>
+              {p.venta_por_peso && (
+                <span className="text-xs text-th-t3 mr-2 shrink-0">kg</span>
+              )}
+              {p.precio_oferta > 0 ? (
+                <span className="text-orange-500 font-bold text-sm mr-2 shrink-0">
+                  ${Number(p.precio_oferta).toLocaleString('es-CO')}
+                </span>
+              ) : (
+                <span className="text-blue-600 font-bold text-sm mr-2 shrink-0">
+                  ${Number(p.precio).toLocaleString('es-CO')}
+                </span>
+              )}
+              <span className="bg-blue-600 text-white text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center shrink-0">
+                +
+              </span>
+            </button>
+          ))}
         </div>
       </div>
 
-      <Carrito
-        items={carrito}
-        onCambiarCantidad={cambiarCantidad}
-        onEliminar={(cartId) => setCarrito((prev) => prev.filter((i) => i._cartId !== cartId))}
-        onCobrar={() => setMostrarPago(true)}
-      />
+      {/* Panel derecho: tickets */}
+      <div className="w-72 flex flex-col shrink-0 bg-th-bg">
+        {/* Tabs de tickets */}
+        <div className="flex items-center gap-1 px-2 pt-2 pb-1.5 overflow-x-auto no-scrollbar border-b border-th-b2">
+          {tickets.map((t) => (
+            <div
+              key={t.id}
+              onClick={() => setTicketActivoId(t.id)}
+              className={`shrink-0 flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium cursor-pointer transition-colors select-none
+                ${ticketActivoId === t.id
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-th-s text-th-t2 hover:bg-th-s2 border border-th-b2'}`}
+            >
+              {editandoId === t.id ? (
+                <input
+                  autoFocus
+                  value={nombreTmp}
+                  onChange={(e) => setNombreTmp(e.target.value)}
+                  onBlur={confirmarRename}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') confirmarRename()
+                    if (e.key === 'Escape') setEditandoId(null)
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                  className="w-16 bg-transparent border-b border-current outline-none text-xs"
+                />
+              ) : (
+                <span
+                  onDoubleClick={(e) => iniciarRename(e, t.id, t.nombre)}
+                  title="Doble clic para renombrar"
+                >
+                  {t.nombre}
+                </span>
+              )}
+              {tickets.length > 1 && (
+                <X
+                  size={10}
+                  onClick={(e) => cerrarTicket(t.id, e)}
+                  className="opacity-60 hover:opacity-100 ml-0.5"
+                />
+              )}
+            </div>
+          ))}
+          <button
+            onClick={nuevoTicket}
+            title="Nuevo ticket"
+            className="shrink-0 w-7 h-7 flex items-center justify-center bg-th-s hover:bg-th-s2 border border-th-b2 rounded-lg text-th-t2 btn-touch transition-colors"
+          >
+            <Plus size={13} />
+          </button>
+        </div>
+
+        {/* Items del ticket activo */}
+        <div className="flex-1 overflow-y-auto scroll-touch px-2 py-1.5 space-y-1">
+          {carrito.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-32 text-th-t4 text-xs">
+              <p className="mb-1">Ticket vacío</p>
+              <p>Toca un producto para agregar</p>
+            </div>
+          ) : carrito.map((item) => (
+            <div key={item._cartId} className="bg-th-s rounded-xl px-2.5 py-2">
+              <div className="flex justify-between items-start gap-1 mb-1.5">
+                <span className="text-th-t text-xs font-semibold flex-1 leading-tight">{item.nombre}</span>
+                <button
+                  onClick={() => setCarrito((prev) => prev.filter((i) => i._cartId !== item._cartId))}
+                  className="text-th-t4 hover:text-red-500 btn-touch shrink-0"
+                >
+                  <X size={12} />
+                </button>
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={() => cambiarCantidad(item._cartId, item.cantidad - 1)}
+                    className="bg-th-s2 hover:bg-red-100 dark:hover:bg-red-900/30 hover:text-red-600 text-th-t w-7 h-7 rounded-lg flex items-center justify-center btn-touch text-sm font-bold"
+                  >−</button>
+                  <span className="text-th-t font-bold text-sm w-5 text-center">{item.cantidad}</span>
+                  <button
+                    onClick={() => cambiarCantidad(item._cartId, item.cantidad + 1)}
+                    className="bg-th-s2 hover:bg-green-100 dark:hover:bg-green-900/30 hover:text-green-600 text-th-t w-7 h-7 rounded-lg flex items-center justify-center btn-touch text-sm font-bold"
+                  >+</button>
+                </div>
+                <span className="text-blue-600 font-bold text-xs">
+                  ${(item.precio * item.cantidad).toLocaleString('es-CO')}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Total y cobrar */}
+        <div className="border-t border-th-b p-3 space-y-2">
+          <div className="flex justify-between items-center">
+            <span className="text-th-t3 text-sm">Total</span>
+            <span className="text-th-t font-bold text-xl">${total.toLocaleString('es-CO')}</span>
+          </div>
+          <button
+            onClick={() => carrito.length > 0 && setMostrarPago(true)}
+            disabled={carrito.length === 0}
+            className="w-full bg-green-600 hover:bg-green-700 disabled:bg-th-s2 disabled:text-th-t4 text-white font-bold py-3 rounded-xl text-lg transition-colors btn-touch"
+          >
+            Cobrar · F12
+          </button>
+        </div>
+      </div>
 
       {mostrarPago && (
         <ModalPago
@@ -222,7 +405,10 @@ export default function Ventas({ config }) {
       {productoPeso && (
         <ModalPeso
           producto={productoPeso}
-          onAgregar={agregarPesado}
+          onAgregar={(item) => {
+            setCarrito((prev) => [...prev, { ...item, _cartId: ++cartIdCounter }])
+            setProductoPeso(null)
+          }}
           onCerrar={() => setProductoPeso(null)}
         />
       )}

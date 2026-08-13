@@ -81,6 +81,7 @@ export default function Ventas({ config }) {
   const [productoPeso, setProductoPeso] = useState(null)
   const [productoOferta, setProductoOferta] = useState(null)
   const inputRef = useRef(null)
+  const latestFnRef = useRef({ agregarAlCarrito: null, modalAbierto: false })
 
   const cargarProductos = useCallback(async () => {
     const filtros = {}
@@ -116,6 +117,10 @@ export default function Ventas({ config }) {
     if (busqueda) { setBusqueda(''); inputRef.current?.focus() }
   }
 
+  // Mantener ref actualizado sin re-registrar el listener global
+  latestFnRef.current.agregarAlCarrito = agregarAlCarrito
+  latestFnRef.current.modalAbierto = !!(mostrarPago || productoPeso || productoOferta)
+
   const handleSearchKeyDown = async (e) => {
     if (e.key !== 'Enter') return
     e.preventDefault()
@@ -147,6 +152,50 @@ export default function Ventas({ config }) {
     if (cantidad <= 0) setCarrito((prev) => prev.filter((i) => i._cartId !== cartId))
     else setCarrito((prev) => prev.map((i) => i._cartId === cartId ? { ...i, cantidad } : i))
   }
+
+  // Detector global de pistola de código de barras
+  // El scanner dispara chars muy rápido (< 150 ms entre teclas) + Enter al final
+  useEffect(() => {
+    let buf = ''
+    let lastKeyTime = 0
+    const onKey = (e) => {
+      if (latestFnRef.current.modalAbierto) return
+      // Si el input de búsqueda tiene foco, handleSearchKeyDown ya lo maneja
+      if (document.activeElement === inputRef.current) return
+      // Ignorar si hay cualquier otro input enfocado (ej: modales)
+      const tag = document.activeElement?.tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return
+
+      const now = Date.now()
+      const diff = now - lastKeyTime
+      lastKeyTime = now
+
+      if (e.key === 'Enter') {
+        const code = buf.trim()
+        buf = ''
+        if (code.length >= 4) {
+          window.api.listarProductos({ busqueda: code }).then((data) => {
+            if (!data.length) return
+            const up = code.toUpperCase()
+            const exacto = data.find(
+              (p) =>
+                (p.descripcion?.trim() || '').toUpperCase() === up ||
+                p.nombre.toUpperCase() === up
+            )
+            const producto = exacto ?? (data.length === 1 ? data[0] : null)
+            if (producto) latestFnRef.current.agregarAlCarrito?.(producto)
+          })
+        }
+        return
+      }
+
+      if (e.key.length === 1) {
+        buf = buf === '' || diff < 150 ? buf + e.key : e.key
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
 
   useEffect(() => {
     const handler = (e) => {

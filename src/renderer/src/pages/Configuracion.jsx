@@ -81,17 +81,25 @@ function Bascula() {
   const [cargando, setCargando] = useState(false)
   const [msg, setMsg] = useState('')
 
-  const cargarPuertos = async () => {
+  const cargarPuertos = async (puertoGuardado) => {
     const lista = await window.api.basculaListarPuertos()
     setPuertos(lista)
-    if (lista.length > 0 && !puerto) setPuerto(lista[0].path)
+    if (lista.length > 0 && !puerto) {
+      const saved = puertoGuardado ?? null
+      setPuerto(saved && lista.find((p) => p.path === saved) ? saved : lista[0].path)
+    }
   }
 
   useEffect(() => {
-    cargarPuertos()
+    window.api.getConfig().then((cfg) => {
+      if (cfg.bascula_puerto) setPuerto(cfg.bascula_puerto)
+      if (cfg.bascula_baudrate) setBaudrate(Number(cfg.bascula_baudrate))
+      cargarPuertos(cfg.bascula_puerto)
+    })
     window.api.basculaEstado().then(({ conectada: c, peso: p }) => {
       setConectada(c)
       if (c && p) setPeso(p.peso)
+      if (c) setMsg('Conectada automáticamente al iniciar')
     })
     const off = window.api.onBasculaPeso(({ peso: p }) => { setPeso(p); setConectada(true) })
     return () => off && off()
@@ -141,7 +149,7 @@ function Bascula() {
                 ? <option value="">Sin puertos</option>
                 : puertos.map((p) => <option key={p.path} value={p.path}>{p.path}{p.descripcion ? ` — ${p.descripcion}` : ''}</option>)}
             </select>
-            <button onClick={cargarPuertos} disabled={conectada} className="bg-th-s2 hover:bg-th-s3 disabled:opacity-40 text-th-t2 p-2 rounded-xl btn-touch" title="Actualizar puertos">
+            <button onClick={() => cargarPuertos(puerto)} disabled={conectada} className="bg-th-s2 hover:bg-th-s3 disabled:opacity-40 text-th-t2 p-2 rounded-xl btn-touch" title="Actualizar puertos">
               <RefreshCw size={14} />
             </button>
           </div>

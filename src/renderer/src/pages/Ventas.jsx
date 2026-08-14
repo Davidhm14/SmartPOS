@@ -117,10 +117,6 @@ export default function Ventas({ config }) {
     if (busqueda) { setBusqueda(''); inputRef.current?.focus() }
   }
 
-  // Mantener ref actualizado sin re-registrar el listener global
-  latestFnRef.current.agregarAlCarrito = agregarAlCarrito
-  latestFnRef.current.modalAbierto = !!(mostrarPago || productoPeso || productoOferta)
-
   const handleSearchKeyDown = async (e) => {
     if (e.key !== 'Enter') return
     e.preventDefault()
@@ -143,6 +139,10 @@ export default function Ventas({ config }) {
     if (producto.precio_oferta > 0) { setProductoOferta(producto); return }
     addToCartDirect(producto, producto.precio)
   }
+
+  // Mantener ref actualizado sin re-registrar el listener global
+  latestFnRef.current.agregarAlCarrito = agregarAlCarrito
+  latestFnRef.current.modalAbierto = !!(mostrarPago || productoPeso || productoOferta)
 
   const agregarPesado = (item) => {
     setCarrito((prev) => [...prev, { ...item, _cartId: ++cartIdCounter }])

@@ -7,7 +7,7 @@ import { registerVentasHandlers } from './ipc/ventas'
 import { registerClientesHandlers } from './ipc/clientes'
 import { registerReportesHandlers } from './ipc/reportes'
 import { registerConfigHandlers } from './ipc/config'
-import { registerBasculaHandlers } from './ipc/bascula'
+import { registerBasculaHandlers, autoConectarBascula } from './ipc/bascula'
 import { registerInventarioHandlers } from './ipc/inventario'
 import { existsSync, mkdirSync, copyFileSync, readdirSync, unlinkSync } from 'fs'
 
@@ -58,6 +58,7 @@ app.whenReady().then(() => {
       mainWindow.webContents.send(channel, data)
     }
   })
+  autoConectarBascula()
 
   ipcMain.handle('dialog:openImage', async () => {
     const result = await dialog.showOpenDialog({

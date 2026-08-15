@@ -57,64 +57,55 @@ function generarTicketHTML(config, items, total, metodo, cambio, fecha) {
 }
 
 function generarReporteHTML(config, data, desde, hasta) {
+  const ancho = config.tamano_papel === '58' ? '58mm' : '80mm'
   const negocio = config.nombre_negocio || 'POS'
-  const periodo = desde === hasta ? desde : `${desde} al ${hasta}`
+  const periodo = desde === hasta ? desde : `${desde}\nal ${hasta}`
   const fecha = new Date().toLocaleString('es-CO')
 
-  const filaMetodo = (m) =>
-    `<tr><td>${m.metodo_pago}</td><td style="text-align:right">${m.cantidad}</td><td style="text-align:right">$${Number(m.monto).toLocaleString('es-CO')}</td></tr>`
+  const linea = '<div class="line"></div>'
 
-  const filaProducto = (p, i) =>
-    `<tr><td>#${i + 1}</td><td>${p.nombre}</td><td style="text-align:right">${p.unidades}</td><td style="text-align:right">$${Number(p.total).toLocaleString('es-CO')}</td>${p.precio_costo > 0 ? `<td style="text-align:right">$${Number(p.utilidad).toLocaleString('es-CO')}</td>` : '<td></td>'}</tr>`
+  const filasMetodo = data.porMetodo.map((m) =>
+    `<tr><td>${m.metodo_pago}</td><td class="r">${m.cantidad} vtas</td><td class="r">$${Number(m.monto).toLocaleString('es-CO')}</td></tr>`
+  ).join('')
 
-  const filaDia = (d) =>
-    `<tr><td>${d.dia}</td><td style="text-align:right">${d.cantidad}</td><td style="text-align:right">$${Number(d.monto).toLocaleString('es-CO')}</td></tr>`
+  const filasProducto = data.productosTop.map((p, i) =>
+    `<tr><td>#${i + 1} ${p.nombre}</td><td class="r">${p.unidades}u</td><td class="r">$${Number(p.total).toLocaleString('es-CO')}</td></tr>`
+  ).join('')
+
+  const filasVentasDia = data.ventasPorDia.map((d) =>
+    `<tr><td>${d.dia}</td><td class="r">${d.cantidad}</td><td class="r">$${Number(d.monto).toLocaleString('es-CO')}</td></tr>`
+  ).join('')
 
   return `<!DOCTYPE html><html><head><meta charset="UTF-8">
     <style>
       * { margin:0; padding:0; box-sizing:border-box; }
-      body { font-family:Arial,sans-serif; font-size:12px; color:#111; padding:20px; }
-      h1 { font-size:20px; margin-bottom:4px; }
-      h2 { font-size:14px; margin:16px 0 6px; border-bottom:1px solid #ccc; padding-bottom:4px; }
-      .sub { color:#555; font-size:11px; margin-bottom:16px; }
-      .stats { display:flex; gap:16px; flex-wrap:wrap; margin-bottom:8px; }
-      .stat { border:1px solid #ddd; border-radius:8px; padding:10px 16px; flex:1; min-width:120px; }
-      .stat .label { font-size:11px; color:#666; }
-      .stat .val { font-size:18px; font-weight:bold; margin-top:2px; }
-      table { width:100%; border-collapse:collapse; font-size:12px; }
-      th { background:#f0f0f0; text-align:left; padding:5px 8px; }
-      td { padding:4px 8px; border-bottom:1px solid #eee; }
-      .footer { margin-top:24px; font-size:10px; color:#888; text-align:right; }
-      @media print { @page { margin:15mm; } body { padding:0; } }
+      body { font-family:'Courier New',monospace; font-size:12px; width:${ancho}; }
+      .c { text-align:center; } .r { text-align:right; } .b { font-weight:bold; }
+      .lg { font-size:14px; } .sm { font-size:10px; }
+      .line { border-top:1px dashed #000; margin:4px 0; }
+      .sec { font-weight:bold; margin:4px 0 2px; }
+      table { width:100%; } td { padding:1px 0; vertical-align:top; }
+      @media print { @page { margin:0; size:${ancho} auto; } }
     </style></head><body>
-    <h1>${negocio}</h1>
-    ${config.nit ? `<div class="sub">NIT: ${config.nit}${config.telefono ? ' | Tel: ' + config.telefono : ''}${config.direccion ? ' | ' + config.direccion : ''}</div>` : '<div class="sub"> </div>'}
-    <div class="sub">Reporte de ventas — Período: ${periodo}</div>
-
-    <div class="stats">
-      <div class="stat"><div class="label">Total ventas</div><div class="val">${data.totalVentas}</div></div>
-      <div class="stat"><div class="label">Ingresos</div><div class="val">$${Number(data.montoTotal).toLocaleString('es-CO')}</div></div>
-      <div class="stat"><div class="label">Utilidad estimada</div><div class="val">$${Number(data.utilidadTotal).toLocaleString('es-CO')}</div></div>
-      ${data.montoTotal > 0 ? `<div class="stat"><div class="label">Margen promedio</div><div class="val">${Math.round((data.utilidadTotal / data.montoTotal) * 100)}%</div></div>` : ''}
-    </div>
-
-    ${data.porMetodo.length > 0 ? `
-    <h2>Métodos de pago</h2>
-    <table><thead><tr><th>Método</th><th style="text-align:right">Ventas</th><th style="text-align:right">Monto</th></tr></thead>
-    <tbody>${data.porMetodo.map(filaMetodo).join('')}</tbody></table>` : ''}
-
-    ${data.productosTop.length > 0 ? `
-    <h2>Productos más vendidos</h2>
-    <table><thead><tr><th>#</th><th>Producto</th><th style="text-align:right">Unidades</th><th style="text-align:right">Total</th><th style="text-align:right">Utilidad</th></tr></thead>
-    <tbody>${data.productosTop.map(filaProducto).join('')}</tbody></table>` : ''}
-
-    ${data.ventasPorDia.length > 0 ? `
-    <h2>Ventas por día</h2>
-    <table><thead><tr><th>Fecha</th><th style="text-align:right">Ventas</th><th style="text-align:right">Monto</th></tr></thead>
-    <tbody>${data.ventasPorDia.map(filaDia).join('')}</tbody></table>` : ''}
-
-    <div class="footer">Generado el ${fecha}</div>
-    </body></html>`
+    <div class="c b lg">${negocio}</div>
+    ${config.nit ? `<div class="c sm">NIT: ${config.nit}</div>` : ''}
+    ${config.telefono ? `<div class="c sm">Tel: ${config.telefono}</div>` : ''}
+    ${linea}
+    <div class="c b">REPORTE DE VENTAS</div>
+    <div class="c sm">${periodo}</div>
+    ${linea}
+    <table>
+      <tr><td>Total ventas</td><td class="r b">${data.totalVentas}</td></tr>
+      <tr><td>Ingresos</td><td class="r b">$${Number(data.montoTotal).toLocaleString('es-CO')}</td></tr>
+      <tr><td>Utilidad est.</td><td class="r b">$${Number(data.utilidadTotal).toLocaleString('es-CO')}</td></tr>
+      ${data.montoTotal > 0 ? `<tr><td>Margen prom.</td><td class="r b">${Math.round((data.utilidadTotal / data.montoTotal) * 100)}%</td></tr>` : ''}
+    </table>
+    ${data.porMetodo.length > 0 ? `${linea}<div class="sec">Metodos de pago</div><table>${filasMetodo}</table>` : ''}
+    ${data.productosTop.length > 0 ? `${linea}<div class="sec">Productos top</div><table>${filasProducto}</table>` : ''}
+    ${data.ventasPorDia.length > 0 ? `${linea}<div class="sec">Ventas por dia</div><table>${filasVentasDia}</table>` : ''}
+    ${linea}
+    <div class="c sm">${fecha}</div>
+    <br/><br/></body></html>`
 }
 
 function StatCard({ icon: Icon, label, value, color }) {
